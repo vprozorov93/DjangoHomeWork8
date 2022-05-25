@@ -1,5 +1,5 @@
 import pytest
-from students.models import Course
+from students.models import Course, Student
 
 
 @pytest.mark.django_db
@@ -40,15 +40,17 @@ def test_list_course_filter_id_and_name(client, course_factory):
     response1 = client.get(path=url1)
     response2 = client.get(path=url2)
     assert response1.status_code == 200
+    assert len(response1.json()) == 1
     assert response1.json()[0]['id'] == course_list[1].id
     assert response2.status_code == 200
+    assert len(response2.json()) == 1
     assert response2.json()[0]['name'] == course_list[0].name
 
 
 @pytest.mark.django_db
-def test_post_update_and_delete_course(client, course_factory, student_factory):
-    # for test post
+def test_post_course(client, student_factory):
     students_list = student_factory(_quantity=10)
+    course_count = Course.objects.count()
     response1 = client.post(path='/api/v1/courses/',
                             data={
                                 'name': 'Курс Нетология',
@@ -56,23 +58,28 @@ def test_post_update_and_delete_course(client, course_factory, student_factory):
                             },
                             format='json')
 
-    # for test update
-    course_list1 = course_factory(_quantity=1)
-
-    url1 = f'/api/v1/courses/{course_list1[0].id}/'
-    response2 = client.patch(path=url1, data={'name': 'COURSE'}, format='json')
-
-    # for test delete
-    course_list2 = course_factory(_quantity=1)
-    url2 = f'/api/v1/courses/{course_list2[0].id}/'
-    response3 = client.delete(path=url2)
-
-    # check result
     assert response1.status_code == 201
     assert response1.json()['name'] == 'Курс Нетология'
+    assert Student.objects.count() == course_count+1
+
+
+@pytest.mark.django_db
+def test_update_course(client, course_factory):
+    course_list = course_factory(_quantity=1)
+
+    url = f'/api/v1/courses/{course_list[0].id}/'
+    response2 = client.patch(path=url, data={'name': 'COURSE'}, format='json')
 
     assert response2.status_code in [200, 204]
-    assert Course.objects.filter(id=course_list1[0].id)[0].name == 'COURSE'
+    assert Course.objects.filter(id=course_list[0].id)[0].name == 'COURSE'
 
-    assert response3.status_code in [200, 204]
-    assert Course.objects.filter(id=course_list2[0].id).count() == 0
+
+@pytest.mark.django_db
+def test_delete_course(client, course_factory, student_factory):
+    course_list = course_factory(_quantity=1)
+    url = f'/api/v1/courses/{course_list[0].id}/'
+
+    response = client.delete(path=url)
+
+    assert response.status_code in [200, 204]
+    assert Course.objects.filter(id=course_list[0].id).count() == 0
